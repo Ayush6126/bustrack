@@ -1,0 +1,15 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+sqlalchemy[asyncio]==2.0.30
+asyncpg==0.29.0
+aiohttp==3.9.5
+pydantic==2.7.1
+python-multipart==0.0.9
+
+# AI / Computer Vision
+ultralytics==8.2.18
+opencv-python-headless==4.9.0.80
+numpy==1.26.4
+
+# Utilities
+python-dotenv==1.0.1

@@ -1,0 +1,82 @@
+# ============================================
+# docker-compose.yml
+# Full BusTrack AI local development stack
+# Run: docker-compose up -d
+# ============================================
+
+version: "3.9"
+
+services:
+
+  # ---- PostgreSQL Database ----
+  postgres:
+    image: postgres:16-alpine
+    container_name: bustrack_db
+    environment:
+      POSTGRES_DB:       bustrack_db
+      POSTGRES_USER:     bustrack
+      POSTGRES_PASSWORD: bustrack123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bustrack -d bustrack_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ---- FastAPI Backend ----
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bustrack_api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://bustrack:bustrack123@postgres:5432/bustrack_db
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./snapshots:/app/snapshots
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  # ---- Frontend (React/Vite) ----
+  frontend:
+    image: node:20-alpine
+    container_name: bustrack_frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "3000:3000"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 3000"
+    environment:
+      VITE_API_URL: http://localhost:8000
+      VITE_WS_URL:  ws://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ---- pgAdmin (optional DB GUI) ----
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: bustrack_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@bustrack.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
